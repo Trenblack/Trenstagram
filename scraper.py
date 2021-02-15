@@ -1,24 +1,20 @@
-import requests, json
+from urllib.request import urlopen
 from bs4 import BeautifulSoup
+from json import loads
 
-def scrape_data(username):
-    r = requests.get(f'https://www.instagram.com/{username}/')
-    soup = BeautifulSoup(r.text, 'html.parser')
-    data = {'username':username}
 
-    for link in soup.find_all('meta'):
-        prop = link.get('property')
-        if prop == "og:image":
-            data['image'] = link.get('content')
-            break
+def scrape(username: str) -> dict:
 
-    for script in soup.find_all('script'):
-        if script.get('type') == 'application/ld+json':
-            new_soup = json.loads(script.encode_contents())
-            if "description" in new_soup:
-                data['bio'] = new_soup['description']
-            else:
-                data['bio'] = ""
-            break
+    with urlopen(f"https://www.instagram.com/{username}/") as response:
+        soup = BeautifulSoup(response.read(), "html.parser")
 
-    return data
+    images = [link.get("content") for link in soup.find_all("meta")
+              if link.get("property") == "og:image"]
+
+    bios = [new_soup["description"] for script in soup.find_all("script")
+            if script.get("type") == "application/ld+json"
+            and "description" in (new_soup := loads(script.encode_contents()))]
+
+    return dict(username=username,
+                bio=bios[0] if len(bios) else None,
+                images=images[0] if len(images) else None)
